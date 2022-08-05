@@ -1,0 +1,9 @@
+nop
+lda 500
+ldb 100
+swt rA rC
+
+str rA
+str 30
+
+hlt

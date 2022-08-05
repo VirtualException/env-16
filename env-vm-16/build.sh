@@ -1,0 +1,1 @@
+gcc -pthread -lSDL2 -D_REENTRANT -o env-vm-16 env16.c inst.c dpy.c

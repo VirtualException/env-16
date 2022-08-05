@@ -1,0 +1,1 @@
+gcc -O2 -s -o env16c env16c.c

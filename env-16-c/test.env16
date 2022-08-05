@@ -1,0 +1,11 @@
+nop
+swt rD rE
+lda 65435
+lde 0xFF
+str rE
+ldr 500
+jmp rE
+jpz 500
+
+add rB rB
+hlt
