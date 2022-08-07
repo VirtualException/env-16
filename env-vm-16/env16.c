@@ -29,8 +29,8 @@ dumpReg() {
     printf("\n[ENV-VM-16 DUMP]\n"
             "rA: %d, rB: %d, rC: %d, rD: %d, rE: %d, PC: 0x%x\n",
             dump_cpu->rA, dump_cpu->rB, dump_cpu->rC, dump_cpu->rD, dump_cpu->rE, dump_cpu->PC);
-
 #endif
+
 }
 
 int
@@ -112,7 +112,7 @@ main(int argc, char* argv[]) {
     signal(SIGTSTP, dumpReg);
     signal(SIGINT, ctrlcHandler);
 
-    initDisplay(128, 72, (void*) env16.ram + ENV16_VIDMEM_OFFST);
+    initDisplay(ENV16_DPY_X, ENV16_DPY_Y, (void*) env16.ram + ENV16_VIDMEM_OFFST);
 
     pthread_create(&winthrd, NULL, handleWindow, NULL);
 
@@ -122,6 +122,11 @@ main(int argc, char* argv[]) {
         env16.cpu.CYCLE += (env16.inst[HI_NIBBLE(CURR_BYTE(&env16))])(&env16);
 
     }
+
+    WORD a = *(WORD*) &env16.ram[500];
+    WORD b = *(WORD*) &env16.ram[30];
+    printf(":%d", a);
+    printf(":%d", b);
 
     pthread_join(winthrd, NULL);
 
