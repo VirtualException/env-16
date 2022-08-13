@@ -1,9 +1,0 @@
-nop
-
-ldc 500
-lda 777
-
-str rC
-str 30
-
-hlt

@@ -10,10 +10,16 @@
 #define VALUE_OVERFLOW      2
 #define NOT_SUPPORTED       3
 #define EXTRA_ARGUMENT      4
+#define INVALID_LABEL       5
+
+struct label {
+    char name[16];
+    uint16_t addr;
+};
 
 enum opcodes {
     NOP = 0b0000,
-    SWT = 0b0001,
+    MOV = 0b0001,
     LDA = 0b0010,
     LDB = 0b0011,
     LDC = 0b0100,
@@ -30,9 +36,9 @@ enum opcodes {
     HLT = 0b1111,
 };
 
-char* OpcodesText[] = {
+char* opcode_txt[] = {
     "nop",
-    "swt",
+    "mov",
     "lda",
     "ldb",
     "ldc",
@@ -51,6 +57,10 @@ char* OpcodesText[] = {
 
 FILE* inf;
 FILE* outf;
+
+// Space for 32 unique labels of 16 characters each
+struct label labels[32] = {0};
+
 
 static inline int writeByte(uint8_t byte, FILE** fd) {
 
@@ -92,6 +102,10 @@ int error(int line, int cause) {
         printf("Error at line %d, EXTRA_ARGUMENT\n", line);
         break;
 
+    case INVALID_LABEL:
+        printf("Error at line %d, INVALID_LABEL\n", line);
+        break;
+
     default:
         printf("Error at line %d", line);
         break;
@@ -107,7 +121,7 @@ int error(int line, int cause) {
 int getOpcode(char* kwrd) {
 
     for (size_t i = 0; i < 16; i++) {
-        if (!memcmp(kwrd, OpcodesText[i], 3)) {
+        if (!memcmp(kwrd, opcode_txt[i], 3)) {
             return i;
         }
     }
@@ -129,7 +143,11 @@ main(int argc, char* argv[]) {
     }
     outf = fopen(argv[2], "w");
 
+
     size_t currline = 0;
+    size_t currbyte = 0;
+
+    size_t currlabel = 0;
 
     char* line = NULL;
     size_t len = 0;
@@ -137,6 +155,7 @@ main(int argc, char* argv[]) {
 
     int opcode = 0;
 
+    // Compile
     while((read = getline(&line, &len, inf)) != EOF) {
 
         currline++;
@@ -147,13 +166,16 @@ main(int argc, char* argv[]) {
         long int    num     = 0;
         uint16_t    num16   = 0;
 
-        if (line[read-1] == '\n') line[read-1] = 0; // Remove the new line character
+        if(strlen(line) <= 2) goto skip2;
+        else if (line[read-1] == '\n') line[read-1] = 0; // Remove the new line character
 
         printf("[DEBUG] Analizing line Nº %d: \"%s\"\n", currline, line);
 
-        if(!strlen(line)) goto skip;
-
         pch = strtok(line, " ");
+
+        if (pch[0] == ';') {
+            goto skip2;
+        }
 
         if((opcode = getOpcode(pch)) < 0) {
             error(currline, NOT_SUPPORTED);
@@ -166,9 +188,11 @@ main(int argc, char* argv[]) {
 
             writeByte(opcode << 4, &outf);
 
+            currbyte += 1;
+
             break;
 
-        case SWT:
+        case MOV:
 
             // Write opcode to file
             writeByte(opcode << 4, &outf);
@@ -194,6 +218,8 @@ main(int argc, char* argv[]) {
             // Write arguments to the file
             writeByte(reg1 << 4 | reg2, &outf);
 
+            currbyte += 3;
+
             break;
 
         case LDA:
@@ -218,6 +244,8 @@ main(int argc, char* argv[]) {
             // Write 16-bit number
             num16 = (uint16_t) num;
             fwrite(&num16, sizeof(uint16_t), 1, outf);
+
+            currbyte += 3;
 
             break;
 
@@ -256,6 +284,8 @@ main(int argc, char* argv[]) {
                 writeByte(0, &outf);
             }
 
+            currbyte += 3;
+
             break;
 
         case ADD:
@@ -290,6 +320,8 @@ main(int argc, char* argv[]) {
             // Write arguments to the file
             writeByte(reg1 << 4 | reg2, &outf);
 
+            currbyte += 2;
+
             break;
 
         default:
@@ -303,7 +335,7 @@ main(int argc, char* argv[]) {
         if ((pch = strtok(NULL, " ")) != NULL && pch[0] != ';') {
             error(currline, EXTRA_ARGUMENT);
         }
-skip:
+skip2:
     }
 
     fclose(inf);

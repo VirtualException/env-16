@@ -1,0 +1,21 @@
+;start
+    ldb 0x3000      ; vidmem size
+    ldc 0x7000      ; vidmem
+
+;loop
+    lda 0xFFFF
+    str rC          ; mov white (1/3) into vidmem
+
+    lde 1
+
+    add rC rE
+    mov rA rC       ; rC++
+    sub rB rE
+    mov rA rB       ; rB--
+
+    mov rB rA
+    jpz 28          ; if rA is 0, go back to loop
+    jmp 6
+
+;end
+    hlt

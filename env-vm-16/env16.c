@@ -21,15 +21,11 @@ ctrlcHandler(int i) {
 void
 dumpReg() {
 
-#if _ENV16DBG
     printf("\n[ENV-VM-16 DUMP]\n"
-            "rA: %d, rB: %d, rC: %d, rD: %d, rE: %d, PC: 0x%x, Opcode: 0x%x\n",
-            dump_cpu->rA, dump_cpu->rB, dump_cpu->rC, dump_cpu->rD, dump_cpu->rE, dump_cpu->PC, dump_cpu->_DBG_CURRENT_OPCODE);
-#else
-    printf("\n[ENV-VM-16 DUMP]\n"
-            "rA: %d, rB: %d, rC: %d, rD: %d, rE: %d, PC: 0x%x\n",
-            dump_cpu->rA, dump_cpu->rB, dump_cpu->rC, dump_cpu->rD, dump_cpu->rE, dump_cpu->PC);
-#endif
+            "rA: %d (0x%x)\nrB: %d (0x%x)\nrC: %d (0x%x)\nrD: %d (0x%x)\nrE: %d (0x%x)\n"
+            "PC: 0x%x, Opcode: 0x%x\n",
+            dump_cpu->rA, dump_cpu->rA, dump_cpu->rB, dump_cpu->rB, dump_cpu->rC, dump_cpu->rC, dump_cpu->rD, dump_cpu->rD, dump_cpu->rE, dump_cpu->rE,
+            dump_cpu->PC, dump_cpu->CURRENT_OPCODE);
 
 }
 
@@ -41,7 +37,7 @@ initEnv16(Env16Machine* env16, FILE** exf) {
     env16->ram = calloc(ENV16_MEMBYTES, 1);
 
     env16->inst[0x0] = env16_nop;
-    env16->inst[0x1] = env16_swt;
+    env16->inst[0x1] = env16_mov;
     env16->inst[0x2] = env16_lda;
     env16->inst[0x3] = env16_ldb;
     env16->inst[0x4] = env16_ldc;
@@ -116,17 +112,13 @@ main(int argc, char* argv[]) {
 
     pthread_create(&winthrd, NULL, handleWindow, NULL);
 
-    while(running) {
+    while(env16.cpu.CYCLE++, running) {
+        //(env16.inst[(env16.cpu.CURRENT_OPCODE = HI_NIBBLE(env16.ram[env16.cpu.PC]))])(&env16);
 
-        //                 |<----           Function           ---->|
-        env16.cpu.CYCLE += (env16.inst[HI_NIBBLE(CURR_BYTE(&env16))])(&env16);
+        env16.cpu.CURRENT_OPCODE = HI_NIBBLE(env16.ram[env16.cpu.PC]);
 
+        (env16.inst[env16.cpu.CURRENT_OPCODE])(&env16);
     }
-
-    WORD a = *(WORD*) &env16.ram[500];
-    WORD b = *(WORD*) &env16.ram[30];
-    printf(":%d", a);
-    printf(":%d", b);
 
     pthread_join(winthrd, NULL);
 
