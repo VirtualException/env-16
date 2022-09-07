@@ -5,6 +5,8 @@
 
 #include <memory.h>
 
+#define BUILDNUM "2.1"
+
 #define INVALID_ARGUMENT    0
 #define EXPECTED_ARGUMENT   1
 #define VALUE_OVERFLOW      2
@@ -18,22 +20,22 @@ struct label {
 };
 
 enum opcodes {
-    NOP = 0b0000,
-    MOV = 0b0001,
-    LDA = 0b0010,
-    LDB = 0b0011,
-    LDC = 0b0100,
-    LDD = 0b0101,
-    LDE = 0b0110,
-    STR = 0b0111,
-    LDR = 0b1000,
-    JMP = 0b1001,
-    JPZ = 0b1010,
-    ADD = 0b1011,
-    SUB = 0b1100,
-    DIV = 0b1101,
-    MUL = 0b1110,
-    HLT = 0b1111,
+    NOP,
+    MOV,
+    LDA,
+    LDB,
+    LDC,
+    LDD,
+    LDE,
+    STR,
+    LDR,
+    JMP,
+    JPZ,
+    ADD,
+    SUB,
+    DIV,
+    MUL,
+    HLT,
 };
 
 char* opcode_txt[] = {
@@ -58,25 +60,16 @@ char* opcode_txt[] = {
 FILE* inf;
 FILE* outf;
 
-// Space for 32 unique labels of 16 characters each
 struct label labels[32] = {0};
+size_t max_label = 0;
 
 
-static inline int writeByte(uint8_t byte, FILE** fd) {
+int writeInstruction(uint8_t opcode, uint16_t args, FILE** fd) {
 
-    fwrite(&byte, 1, 1, *fd);
+    fwrite(&opcode, 1, 1, *fd);
+    fwrite(&args, 1, 2, *fd);
+
     return EXIT_SUCCESS;
-
-}
-
-int reg2num(char* kwrd, uint8_t* regN) {
-
-    if (kwrd[0] == 'r' && kwrd[1] >= 'A' && kwrd[1] <= 'E') {
-       *regN = kwrd[1] - 65;
-       return 0;
-    }
-    else return 1;
-
 }
 
 int error(int line, int cause) {
@@ -118,6 +111,28 @@ int error(int line, int cause) {
 
 }
 
+int reg2num(char* kwrd, uint8_t* regN) {
+
+    if (kwrd[0] == 'r' && kwrd[1] >= 'A' && kwrd[1] <= 'E' && kwrd[2] == '\0') {
+       *regN = kwrd[1] - 65;
+       return 0;
+    }
+    else return 1;
+
+}
+
+int getLabel(char* label) {
+
+    if(label == NULL) return -2;
+
+    for (size_t i = 0; i < max_label ; i++) {
+        if (!strcmp(label, labels[i].name)) return labels[i].addr;
+    }
+
+    return -1;
+
+}
+
 int getOpcode(char* kwrd) {
 
     for (size_t i = 0; i < 16; i++) {
@@ -132,8 +147,18 @@ int getOpcode(char* kwrd) {
 int
 main(int argc, char* argv[]) {
 
-    if (argc < 3) {
-        fprintf(stderr, "Usage: %s <input> <output>\n", argv[0]);
+    // Argument checking
+
+    if (argc != 3) {
+        if (argc == 2 && !strcmp(argv[1], "-v")) {
+
+            printf("ENV16 Compiler for x86_64\nBuild: %s (%s)\n", BUILDNUM, __TIMESTAMP__);
+            printf("Usage: %s [-v] <input> <output>\n", argv[0]);
+
+            exit(EXIT_SUCCESS);
+        }
+
+        fprintf(stderr, "Usage: %s [-v] <input> <output>\n", argv[0]);
         exit(EXIT_FAILURE);
     }
 
@@ -143,6 +168,7 @@ main(int argc, char* argv[]) {
     }
     outf = fopen(argv[2], "w");
 
+    // File-related variables
 
     size_t currline = 0;
     size_t currbyte = 0;
@@ -155,16 +181,73 @@ main(int argc, char* argv[]) {
 
     int opcode = 0;
 
-    // Compile
+    int i = 1;
+
+    // Preprocess file
+
     while((read = getline(&line, &len, inf)) != EOF) {
 
+        char*   pch         = NULL;
+        size_t  pch_len     = 0;
+        char    label[16];
+
         currline++;
+
+        if(strlen(line) <= 2) goto skip1;
+        else if (line[read-1] == '\n') line[read-1] = 0; // Remove the new line character
+
+        pch = strtok(line, " ");
+
+        if (pch[0] == ';') {
+            goto skip1;
+        }
+
+        if ((opcode = getOpcode(pch)) >= 0) {
+            currbyte += 3;
+            goto skip1;
+        }
+
+        pch_len = strlen(pch);
+
+        if (pch[pch_len-1] != ':') {
+            goto skip1;
+        }
+
+        if ((pch_len = strlen(pch)) > 16 || strtok(NULL, " ") != NULL) {
+            error(currline, INVALID_LABEL);
+        }
+
+        strcpy(labels[currlabel].name, pch);
+        labels[currlabel].addr = currbyte;
+        currlabel++;
+
+skip1:
+    }
+
+    max_label = currlabel;
+
+    printf("\n[DEBUG] Labels:\n");
+
+    for (size_t i = 0; i < max_label; i++) {
+        printf("%s \t-> \t0x%X\n", labels[i].name, labels[i].addr);
+    }
+
+    printf("\n");
+
+    fseek(inf, 0, SEEK_SET);
+    currline = 0;
+
+    // Process instructions
+
+    while((read = getline(&line, &len, inf)) != EOF) {
 
         char*       pch     = NULL;
         uint8_t     reg1    = 0;
         uint8_t     reg2    = 0;
         long int    num     = 0;
-        uint16_t    num16   = 0;
+        size_t      addr    = 0;
+
+        currline++;
 
         if(strlen(line) <= 2) goto skip2;
         else if (line[read-1] == '\n') line[read-1] = 0; // Remove the new line character
@@ -178,24 +261,23 @@ main(int argc, char* argv[]) {
         }
 
         if((opcode = getOpcode(pch)) < 0) {
-            error(currline, NOT_SUPPORTED);
+            if (getLabel(pch) < 0) {
+                error(currline, NOT_SUPPORTED);
+            }
+            else goto skip2;
         }
 
-        switch (opcode) {
+        switch ((uint8_t) opcode) {
 
         case NOP:
         case HLT:
 
-            writeByte(opcode << 4, &outf);
-
-            currbyte += 1;
+            // Write instruction
+            writeInstruction(opcode << 4, 0, &outf);
 
             break;
 
         case MOV:
-
-            // Write opcode to file
-            writeByte(opcode << 4, &outf);
 
             // Next keyword
             if ((pch = strtok(NULL, " ")) == NULL) {
@@ -215,10 +297,8 @@ main(int argc, char* argv[]) {
                 error(currline, INVALID_ARGUMENT);
             }
 
-            // Write arguments to the file
-            writeByte(reg1 << 4 | reg2, &outf);
-
-            currbyte += 3;
+            // Write instruction
+            writeInstruction(opcode << 4, ((uint16_t) reg2 << 8) | reg1, &outf);
 
             break;
 
@@ -227,9 +307,6 @@ main(int argc, char* argv[]) {
         case LDC:
         case LDD:
         case LDE:
-
-            // Write opcode
-            writeByte(opcode << 4, &outf);
 
             // Next keyword
             if ((pch = strtok(NULL, " ")) == NULL) {
@@ -241,19 +318,13 @@ main(int argc, char* argv[]) {
                 error(currline, VALUE_OVERFLOW);
             }
 
-            // Write 16-bit number
-            num16 = (uint16_t) num;
-            fwrite(&num16, sizeof(uint16_t), 1, outf);
-
-            currbyte += 3;
+            // Write instruction
+            writeInstruction(opcode << 4, (uint16_t) num, &outf);
 
             break;
 
         case STR:
         case LDR:
-
-        case JMP:
-        case JPZ:
 
             // Next keyword
             if ((pch = strtok(NULL, " ")) == NULL) {
@@ -267,24 +338,50 @@ main(int argc, char* argv[]) {
                     error(currline, VALUE_OVERFLOW);
                 }
 
-                // Write opcode
-                writeByte(opcode << 4, &outf);
-
-                // Write 16-bit number
-                num16 = (uint16_t) num;
-                fwrite(&num16, sizeof(uint16_t), 1, outf);
+                // Write instruction
+                writeInstruction(opcode << 4, (uint16_t) num, &outf);
 
             }
             else { 
-                // Write opcode with register
-                writeByte(opcode << 4 | reg1 | 0b0001000, &outf);
 
-                // Write 16-bits empty
-                writeByte(0, &outf);
-                writeByte(0, &outf);
+                // Write instruction (with register)
+                writeInstruction((opcode << 4 | reg1) | 0b0001000, 0, &outf);
+
             }
 
-            currbyte += 3;
+            break;
+
+        case JMP:
+        case JPZ:
+
+            // Next keyword
+            if ((pch = strtok(NULL, " ")) == NULL) {
+                error(currline, EXPECTED_ARGUMENT);
+            }
+
+            if (!reg2num(pch, &reg1)) {
+
+                // Write instruction (with register)
+                writeInstruction((opcode << 4 | reg1) | 0b0001000, 0, &outf);
+
+            }
+            else if ((addr = getLabel(pch)) >= 0) {
+
+                // Write instruction (with label address)
+                writeInstruction(opcode << 4, (uint16_t) addr, &outf);
+
+            }
+            else { 
+
+                num = strtol(pch, NULL, 0);
+                if (num > 65535) {
+                    error(currline, VALUE_OVERFLOW);
+                }
+
+                // Write instruction (with immediate)
+                writeInstruction(opcode << 4, (uint16_t) num, &outf);
+
+            }
 
             break;
 
@@ -293,16 +390,10 @@ main(int argc, char* argv[]) {
         case DIV:
         case MUL:
 
-            // Write opcode
-            writeByte(opcode << 4, &outf);
-
             // Next keyword
             if ((pch = strtok(NULL, " ")) == NULL) {
                 error(currline, EXPECTED_ARGUMENT);
             }
-
-            uint8_t reg1;
-            uint8_t reg2;
 
             if (reg2num(pch, &reg1)) {
                 error(currline, INVALID_ARGUMENT);
@@ -317,10 +408,11 @@ main(int argc, char* argv[]) {
                 error(currline, INVALID_ARGUMENT);
             }
 
-            // Write arguments to the file
-            writeByte(reg1 << 4 | reg2, &outf);
+            // Write instruction
+            //printf("[%d, %d]", reg1, reg2);
+            writeInstruction(opcode << 4, ((uint16_t) reg1 << 8) | reg2, &outf);
 
-            currbyte += 2;
+            currbyte += 3;
 
             break;
 

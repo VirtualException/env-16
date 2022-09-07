@@ -1,21 +1,48 @@
-;start
-    ldb 0x3000      ; vidmem size
-    ldc 0x7000      ; vidmem
+start:
+    ldc 0x9000      ; store size in rC
+    ldd 0x7000      ; store vidmem size in rD
 
-;loop
-    lda 0xFFFF
-    str rC          ; mov white (1/3) into vidmem
+    ldb 127
 
-    lde 1
+    ;lda 0
+    ;str 0x100
+    ldr 0x100
+hlt
 
-    add rC rE
-    mov rA rC       ; rC++
-    sub rB rE
-    mov rA rB       ; rB--
+loop:
+    jmp plot_pixel:
+ret1:
+    lde 4
+    sub rC rE
+    mov rA rC       ; subtract rC by 4
+
+    jpz exit:       ; if rC is 0
+    jmp loop:       ; else
+
+exit:
+    hlt
+
+plot_pixel:
 
     mov rB rA
-    jpz 28          ; if rA is 0, go back to loop
-    jmp 6
+    str rD          ; write rA in memory adress rD
 
-;end
-    hlt
+    lde 1
+    add rD rE
+    mov rA rD       ; increment rD by 1
+
+    mov rB rA
+    str rD          ; write rA in memory adress rD
+
+    lde 1
+    add rD rE
+    mov rA rD       ; increment rD by 1
+
+    mov rB rA
+    str rD          ; write rA in memory adress rD
+
+    lde 2
+    add rD rE
+    mov rA rD       ; increment rD by 2
+
+    jmp ret1:

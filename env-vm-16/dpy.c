@@ -31,7 +31,7 @@ initDisplay(int w, int h, void* vidmem) {
     pixels = malloc(w * h * sizeof(uint32_t));
     pitch = w * sizeof(uint32_t);
 
-    txr = SDL_CreateTexture(rdr, SDL_PIXELFORMAT_RGBA8888, SDL_TEXTUREACCESS_STREAMING, w, h);
+    txr = SDL_CreateTexture(rdr, SDL_PIXELFORMAT_ARGB8888, SDL_TEXTUREACCESS_STREAMING, w, h);
     SDL_SetRenderTarget(rdr, txr);
 
 }

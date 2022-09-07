@@ -1,8 +1,8 @@
-███████ ███    ██ ██    ██         ██   ██████  
-██      ████   ██ ██    ██       ████  ██       
-█████   ██ ██  ██ ██    ██ █████   ██  ███████  
-██      ██  ██ ██  ██  ██          ██  ██    ██ 
-███████ ██   ████   ████          ████  ██████  
+||||||| |||    || ||    ||         ||   ||||||
+||      ||||   || ||    ||       ||||  ||
+|||||   || ||  || ||    || |||||   ||  |||||||
+||      ||  || ||  ||  ||          ||  ||    ||
+||||||| ||   ||||   ||||          ||||  ||||||
 
 26/07/2022
 VirtualException
@@ -15,24 +15,32 @@ minimalistic emulator
 
 ___________________________
 
-ENV(-VM)-16 Specifications:
+ENV-16 Specifications:
 ___________________________
 
 -> 16-bit architecture
 -> 65536 (2^16) Bytes of ramdom access memory (RAM)
 -> 5 16-bit registers:
     rA (Primary, used for results and I/O)
-    rB
-    rC
-    rD
-    rE
+    rB, rC, rD, rE
+-> 24-bit Instructions
 -> Program Counter (PC)
--> Display: 128x72 Screen (Last 36864 Bytes of RAM)
+-> Display: 128x72 Screen (Last 28672 Bytes of RAM)
 
-________________
+0x0                          0x7000         0x10000
+v                            v              v
+.---------.------------------.--------------.
+| Program |       Free       | Video Memory |
+'---------'------------------'--------------'
 
-Instruction set:
-________________
+___________________________
+
+Instruction set & encoding:
+___________________________
+
+There are 16 different instructions, 4 of them with 5 variants; one for
+each register plus the one with the inmmediate value. This instruction are
+marked with a '*'.
 
 Notes:
 
@@ -47,29 +55,23 @@ Example: str rB  -->> 0111 1[001].00000000.00000000
 // Stores the value of rA in the memory address stored in rB
 
 
-0x0                  0x7000           0x10000
-v                    v                v
-.---------.----------.----------------.
-| Program |   Free   |  Video Memory  |
-'---------'----------'----------------'
+                    (Machine Code, 24-bit enconding)
+                        8 bits       16 bits
+                      .---^---. .-------^-------.
 
+Name & Desc.          Opcode    Arguments
+|                     |         |
+v                     v         v
 
-                         Machine Code (Binary)
-                        8 bits   8 bits   8 bits
-                      .---^---. .--^^--. .--^^--.
+nop         	    : 0000 0000.00000000.00000000
 
-Name & Desc.          Opcode    Arguments           Length
-v                     v         v                   v
+    No operation
 
-nop         	    : 0000 0000                     8 bits (1 byte)
+                                <Index > < Index>
+                                v      v v      v
+mov <reg1> <reg2>   : 0001 0000.00000000.00000000
 
-....No operation
-
-                            Index   Index
-                                v   v
-mov <reg1> <reg2>   : 0001 0000.00000000            16 bits (2 bytes)
-
-....Switch <reg1> with <reg2>
+    Move <reg1> into <reg2>
 
                                 <     Value     >
                                 v               v
@@ -77,58 +79,58 @@ lda <ival>          : 0010 0000.00000000.00000000
 ldb <ival>          : 0011 0000.00000000.00000000
 ldc <ival>          : 0100 0000.00000000.00000000
 ldd <ival>          : 0101 0000.00000000.00000000
-lde <ival>          : 0110 0000.00000000.00000000   24 bits (3 bytes)
+lde <ival>          : 0110 0000.00000000.00000000
 
-....Load the immediate <val> into rX
-
-                           <rX> <    Address    >
-                           v    v               v
-str <addr/rX>       : 0111 0000.00000000.00000000   24 bits (3 bytes)
-
-....Store the value of rA into memory address <addr>
+    Load the immediate <val> into rX
 
                            <rX> <    Address    >
-                           v    v               v
-ldr <addr/rX>       : 1000 0000.00000000.00000000   24 bits (3 bytes)
+                           v  v v               v
+str <addr/rX>       : 0111 0000.00000000.00000000
 
-....Store the value at memory address <addr> into rA
+    Store the value of rA into memory address <addr>    *
+
+                           <rX> <    Address    >
+                           v  v v               v
+ldr <addr/rX>       : 1000 0000.00000000.00000000
+
+    Store the value at memory address <addr> into rA    *
 
                            <rX> <     Value     >
-                           v    v               v
-jmp <val/rX>        : 1001 0000.00000000.00000000   24 bits (3 bytes)
+                           v  v v               v
+jmp <val/rX>        : 1001 0000.00000000.00000000
 
-....Set the PC to <val> (or rX)
+    Set the PC to <val>                                 *
 
                            <rX> <     Value     >
-                           v    v               v
-jpz <val/rX>        : 1010 0000.00000000.00000000   24 bits (3 bytes)
+                           v  v v               v
+jpz <val/rX>        : 1010 0000.00000000.00000000
 
-....Set the PC to <val> (or rX) if rA == 0
+    Set the PC to <val> if rA is 0                      *
 
-                            Index   Index
-                                v   v
-add <reg1> <reg2>   : 1011 0000.00000000            16 bits (2 bytes)
+                                <Index > < Index>
+                                v      v v      v
+add <reg1> <reg2>   : 1011 0000.00000000.00000000
 
-....Add reg1 with reg2 and store the result on rA
+    Add reg1 with reg2 and store the result on rA
 
-                            Index   Index
-                                v   v
-sub <reg1> <reg2>   : 1100 0000.00000000            16 bits (2 bytes)
+                                <Index > < Index>
+                                v      v v      v
+sub <reg1> <reg2>   : 1100 0000.00000000.00000000
 
-....Subtract reg1 from reg2 and store the result on rA
+    Subtract reg1 from reg2 and store the result on rA
 
-                            Index   Index
-                                v   v
-div <reg1> <reg2>   : 1101 0000.00000000            16 bits (2 bytes)
+                                <Index > < Index>
+                                v      v v      v
+div <reg1> <reg2>   : 1101 0000.00000000.00000000
 
-....Divide reg1 by reg2 and store the result on rA
+    Divide reg1 by reg2 and store the result on rA
 
-                            Index   Index
-                                v   v
-mul <reg1> <reg2>   : 1110 0000.00000000            16 bits (2 bytes)
+                                <Index > < Index>
+                                v      v v      v
+mul <reg1> <reg2>   : 1110 0000.00000000.00000000
 
-....Multiply reg1 by reg2 and store the result on rA
+    Multiply reg1 by reg2 and store the result on rA
 
-hlt                 : 1111 0000                     8 bits (1 byte)
+hlt                 : 1111 0000.00000000.00000000
 
-....Halt the cpu
+    Halt the cpu

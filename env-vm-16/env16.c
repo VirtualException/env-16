@@ -22,10 +22,10 @@ void
 dumpReg() {
 
     printf("\n[ENV-VM-16 DUMP]\n"
-            "rA: %d (0x%x)\nrB: %d (0x%x)\nrC: %d (0x%x)\nrD: %d (0x%x)\nrE: %d (0x%x)\n"
-            "PC: 0x%x, Opcode: 0x%x\n",
+            "rA: %d (0x%X)\nrB: %d (0x%X)\nrC: %d (0x%X)\nrD: %d (0x%X)\nrE: %d (0x%X)\n"
+            "PC: %d (0x%X), Opcode: %d (0x%X)\n",
             dump_cpu->rA, dump_cpu->rA, dump_cpu->rB, dump_cpu->rB, dump_cpu->rC, dump_cpu->rC, dump_cpu->rD, dump_cpu->rD, dump_cpu->rE, dump_cpu->rE,
-            dump_cpu->PC, dump_cpu->CURRENT_OPCODE);
+            dump_cpu->PC, dump_cpu->PC, dump_cpu->CURRENT_OPCODE, dump_cpu->CURRENT_OPCODE);
 
 }
 
@@ -34,7 +34,8 @@ initEnv16(Env16Machine* env16, FILE** exf) {
 
     memset(&env16->cpu, 0x0, sizeof(Env16Cpu));
 
-    env16->ram = calloc(ENV16_MEMBYTES, 1);
+    env16->ram = malloc(ENV16_MEMBYTES);
+    memset(env16->ram, 0x0, ENV16_MEMBYTES);
 
     env16->inst[0x0] = env16_nop;
     env16->inst[0x1] = env16_mov;
@@ -113,11 +114,7 @@ main(int argc, char* argv[]) {
     pthread_create(&winthrd, NULL, handleWindow, NULL);
 
     while(env16.cpu.CYCLE++, running) {
-        //(env16.inst[(env16.cpu.CURRENT_OPCODE = HI_NIBBLE(env16.ram[env16.cpu.PC]))])(&env16);
-
-        env16.cpu.CURRENT_OPCODE = HI_NIBBLE(env16.ram[env16.cpu.PC]);
-
-        (env16.inst[env16.cpu.CURRENT_OPCODE])(&env16);
+        (env16.inst[(env16.cpu.CURRENT_OPCODE = HI_NIBBLE(env16.ram[env16.cpu.PC]))])(&env16);
     }
 
     pthread_join(winthrd, NULL);
